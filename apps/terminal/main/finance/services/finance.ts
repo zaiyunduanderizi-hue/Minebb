@@ -1,6 +1,6 @@
-import type { Candle, Quote, SymbolSearchResult, Timeseries } from "@minebb/common/finance/types";
-import type { IpcChannels } from "@minebb/main/ipc/channels";
-import { getAdapter } from "@minebb/main/finance/registry";
+import type { Candle, Quote, SymbolSearchResult, Timeseries } from "../../../common/finance/types";
+import type { IpcChannels } from "../../ipc/channels";
+import { getAdapter } from "../registry";
 import { MemoryCacheLayer } from "./cache";
 
 export type ServiceError = Error & {

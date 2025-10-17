@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Candle, Quote, Timeseries } from "@minebb/common/finance/types";
+import type { Candle, Quote, Timeseries } from "../../common/finance/types";
 
 const friendlyErrorMap: z.ZodErrorMap = (issue, ctx) => {
   const path = issue.path.join(".");

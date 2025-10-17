@@ -1,5 +1,5 @@
 import fetch, { type Response } from "node-fetch";
-import { parseQuote, parseTimeseriesCandle } from "@minebb/main/finance/codecs";
+import { parseQuote, parseTimeseriesCandle } from "../codecs";
 import type {
   Candle,
   FinanceAdapter,
@@ -9,7 +9,7 @@ import type {
   SymbolSearchResult,
   Timeframe,
   Timeseries,
-} from "@minebb/common/finance/types";
+} from "../../../common/finance/types";
 
 const BASE_URL = "https://open.lixinger.com/api";
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];

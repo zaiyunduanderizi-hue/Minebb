@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron apps/terminal/main/index.ts",
+    "electron:dev": "tsc -p . && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron apps/terminal/dist/main/index.js",
     "build": "tsc -p .",
     "test": "vitest run",
     "verify": "node ./scripts/verify-environment.cjs"

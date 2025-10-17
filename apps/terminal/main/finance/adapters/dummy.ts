@@ -1,4 +1,4 @@
-import { parseQuote, parseTimeseriesCandle } from "@minebb/main/finance/codecs";
+import { parseQuote, parseTimeseriesCandle } from "../codecs";
 import type {
   Candle,
   FinanceAdapter,
@@ -8,7 +8,7 @@ import type {
   SymbolSearchResult,
   Timeframe,
   Timeseries,
-} from "@minebb/common/finance/types";
+} from "../../../common/finance/types";
 
 const buildTimeseries = (
   symbol: SymbolCode,

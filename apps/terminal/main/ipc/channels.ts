@@ -6,7 +6,7 @@ import type {
   SymbolCode,
   Timeframe,
   Timeseries,
-} from "@minebb/common/finance/types";
+} from "../../common/finance/types";
 
 export interface IpcChannels {
   "finance:getCandles": {

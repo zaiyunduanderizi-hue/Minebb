@@ -2,11 +2,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { dummyAdapter } from "@minebb/main/finance/adapters/dummy";
-import { lixingerAdapter } from "@minebb/main/finance/adapters/lixinger";
-import { createFinanceService } from "@minebb/main/finance/services/finance";
-import { registerAdapter } from "@minebb/main/finance/registry";
-import { createMainRegistrar } from "@minebb/main/ipc/channels";
+import { dummyAdapter } from "./finance/adapters/dummy";
+import { lixingerAdapter } from "./finance/adapters/lixinger";
+import { createFinanceService } from "./finance/services/finance";
+import { registerAdapter } from "./finance/registry";
+import { createMainRegistrar } from "./ipc/channels";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
