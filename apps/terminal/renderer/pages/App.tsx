@@ -1,5 +1,5 @@
 import React from "react";
-import KLinePanel from "./panels/KLinePanel";
+import KLinePanel from "@minebb/ui/finance/components/KLinePanel";
 
 export default function App() {
   return (

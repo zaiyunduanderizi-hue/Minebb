@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
-import type { LxResponseMeta } from "../../common/ipc/dto";
-import { TokenDialog } from "../components/TokenDialog";
-import { useCandles, useQuote } from "../hooks/finance";
-import { FinanceError } from "../services/finance";
-import { useCountdown } from "../utils/useCountdown";
+import type { LxResponseMeta } from "@minebb/common/ipc/dto";
+import { TokenDialog } from "@minebb/ui/components/TokenDialog";
+import { useCandles, useQuote } from "@minebb/ui/finance/hooks/queries";
+import { FinanceError } from "@minebb/ui/finance/client";
+import { useCountdown } from "@minebb/ui/hooks/useCountdown";
 
 const PANEL_STYLE: React.CSSProperties = {
   borderRadius: 16,

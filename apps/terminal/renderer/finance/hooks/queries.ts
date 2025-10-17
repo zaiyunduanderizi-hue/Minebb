@@ -1,11 +1,11 @@
 import { useQuery, type UseQueryOptions, type UseQueryResult } from "@tanstack/react-query";
-import type { Candle, Quote, Timeseries } from "../../common/finance/types";
+import type { Candle, Quote, Timeseries } from "@minebb/common/finance/types";
 import {
   type FinanceError,
   type FinanceResponse,
   fetchCandles,
   fetchQuote,
-} from "../services/finance";
+} from "@minebb/ui/finance/client";
 
 const defaultRetry = (failureCount: number, error: unknown) => {
   if (error instanceof Error && "category" in error) {

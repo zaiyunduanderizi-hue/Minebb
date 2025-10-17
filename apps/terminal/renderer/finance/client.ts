@@ -4,12 +4,12 @@ import type {
   Quote,
   Timeframe,
   Timeseries,
-} from "../../common/finance/types";
+} from "@minebb/common/finance/types";
 import type {
   LxFetchRequest,
   LxFetchResponse,
   LxResponseMeta,
-} from "../../common/ipc/dto";
+} from "@minebb/common/ipc/dto";
 
 export type FinanceRouteParams = {
   "fin.candles/get": { symbol: string; market: Market; timeframe: Timeframe; from?: number; to?: number };

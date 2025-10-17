@@ -66,7 +66,7 @@ export const indicatorResultSchema = z.object({
   name: z.string().min(1),
   values: z.array(
     z.object({
-      timestamp: z.number().int().nonnegative(),
+      t: z.number().int().nonnegative(),
       value: z.number(),
     })
   ),
