@@ -1,72 +1,123 @@
 import { z } from "zod";
+import type { Candle, Quote, Timeseries } from "./types";
 
-export const tickerSchema = z.string().min(1);
+const friendlyErrorMap: z.ZodErrorMap = (issue, ctx) => {
+  const path = issue.path.join(".");
+  const location = path ? ` at \`${path}\`` : "";
+  switch (issue.code) {
+    case z.ZodIssueCode.invalid_type:
+      return {
+        message: `Expected ${issue.expected} but received ${issue.received}${location}.`,
+      };
+    case z.ZodIssueCode.invalid_enum_value:
+      return {
+        message: `Value${location} must be one of: ${(issue.options ?? []).join(", ")}.`,
+      };
+    case z.ZodIssueCode.custom:
+      return { message: issue.message ?? `Invalid value${location}.` };
+    default:
+      return { message: `${issue.message}${location}` };
+  }
+};
 
-export const candleSchema = z.object({
-  ticker: tickerSchema,
-  timeframe: z.string().min(1),
-  timestamp: z.number().int().nonnegative(),
-  open: z.number(),
-  high: z.number(),
-  low: z.number(),
-  close: z.number(),
-  volume: z.number().nonnegative().optional(),
+const number = () => z.number({ invalid_type_error: "Must be a number." }).finite("Must be a finite number.");
+
+export const marketSchema = z.enum(["CN", "HK"], {
+  errorMap: friendlyErrorMap,
 });
 
-export const quoteSchema = z.object({
-  ticker: tickerSchema,
-  price: z.number(),
-  bid: z.number().optional(),
-  ask: z.number().optional(),
-  timestamp: z.number().int().nonnegative(),
-  currency: z.string().optional(),
+export const timeframeSchema = z.enum(["1d", "1w", "1m"], {
+  errorMap: friendlyErrorMap,
 });
 
-export const positionSchema = z.object({
-  ticker: tickerSchema,
-  quantity: z.number(),
-  averageCost: z.number(),
-  marketValue: z.number().optional(),
-  currency: z.string().optional(),
-  updatedAt: z.number().int().nonnegative(),
-});
+export const candlePointSchema = z
+  .object(
+    {
+      t: number().int().nonnegative("Timestamp must be a non-negative integer."),
+      o: number(),
+      h: number(),
+      l: number(),
+      c: number(),
+      v: number().nonnegative("Volume must be non-negative.").optional(),
+    },
+    { errorMap: friendlyErrorMap }
+  )
+  .strict();
 
-export const portfolioSnapshotSchema = z.object({
-  accountId: z.string().min(1),
-  timestamp: z.number().int().nonnegative(),
-  cash: z.number(),
-  equity: z.number(),
-  positions: z.array(positionSchema),
-});
+export const timeseriesCandleSchema = z
+  .object(
+    {
+      symbol: z.string({ required_error: "Symbol is required." }).min(1, "Symbol cannot be empty."),
+      market: marketSchema,
+      timeframe: timeframeSchema,
+      points: z
+        .array(candlePointSchema, {
+          invalid_type_error: "Points must be an array of candles.",
+        })
+        .superRefine((points, ctx) => {
+          let prev = -Infinity;
+          for (const [index, candle] of points.entries()) {
+            if (!Number.isFinite(candle.t)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["points", index, "t"],
+                message: "Timestamp must be finite.",
+              });
+              continue;
+            }
+            if (candle.t < prev) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["points", index, "t"],
+                message: "Candles must be sorted by ascending timestamp.",
+              });
+              return;
+            }
+            prev = candle.t;
+          }
+        }),
+      meta: z.record(z.unknown()).optional(),
+    },
+    { errorMap: friendlyErrorMap }
+  )
+  .strict();
 
-export const factorSeriesPointSchema = z.object({
-  name: z.string().min(1),
-  ticker: tickerSchema,
-  timestamp: z.number().int().nonnegative(),
-  value: z.number(),
-  metadata: z.record(z.unknown()).optional(),
-});
+export const quoteSchema = z
+  .object(
+    {
+      symbol: z.string({ required_error: "Symbol is required." }).min(1, "Symbol cannot be empty."),
+      market: marketSchema,
+      price: number(),
+      change: number().optional(),
+      changePct: number().optional(),
+      ts: number().int().nonnegative("Timestamp must be a non-negative integer."),
+    },
+    { errorMap: friendlyErrorMap }
+  )
+  .strict();
 
-export const indicatorInputSchema = z.object({
-  series: z.array(candleSchema),
-  params: z.record(z.unknown()).optional(),
-});
-
-export const indicatorResultSchema = z.object({
-  name: z.string().min(1),
-  values: z.array(
-    z.object({
-      timestamp: z.number().int().nonnegative(),
-      value: z.number(),
+const formatIssues = (issues: z.ZodIssue[]): string =>
+  issues
+    .map((issue) => {
+      const path = issue.path.join(".");
+      return path ? `${issue.message} (at \`${path}\`)` : issue.message;
     })
-  ),
-  meta: z.record(z.unknown()).optional(),
-});
+    .join("; ");
 
-export type CandleCodec = z.infer<typeof candleSchema>;
-export type QuoteCodec = z.infer<typeof quoteSchema>;
-export type PositionCodec = z.infer<typeof positionSchema>;
-export type PortfolioSnapshotCodec = z.infer<typeof portfolioSnapshotSchema>;
-export type FactorSeriesPointCodec = z.infer<typeof factorSeriesPointSchema>;
-export type IndicatorInputCodec = z.infer<typeof indicatorInputSchema>;
-export type IndicatorResultCodec = z.infer<typeof indicatorResultSchema>;
+export const parseTimeseriesCandle = (
+  input: unknown
+): Timeseries<Candle> => {
+  const result = timeseriesCandleSchema.safeParse(input, { errorMap: friendlyErrorMap });
+  if (!result.success) {
+    throw new Error(`Timeseries validation failed: ${formatIssues(result.error.issues)}`);
+  }
+  return result.data;
+};
+
+export const parseQuote = (input: unknown): Quote => {
+  const result = quoteSchema.safeParse(input, { errorMap: friendlyErrorMap });
+  if (!result.success) {
+    throw new Error(`Quote validation failed: ${formatIssues(result.error.issues)}`);
+  }
+  return result.data;
+};

@@ -1,88 +1,70 @@
+import type { CandlesParams, LxFetchRes, QuoteParams } from "../../common/ipc/dto";
 import type {
   Candle,
-  FactorSeriesPoint,
-  PortfolioSnapshot,
   Quote,
+  SymbolSearchResult,
+  Timeseries,
 } from "../../common/finance/types";
-import type { IpcRequestEnvelope, IpcResponseEnvelope } from "../../common/ipc/dto";
-import { IpcError } from "../../common/ipc/errors";
 
-type FinanceRequestChannel =
-  | "finance:candles"
-  | "finance:quote"
-  | "finance:portfolio"
-  | "finance:factor-series";
-
-interface FinanceRequestPayloads {
-  "finance:candles": {
-    adapterId: string;
-    ticker: string;
-    timeframe: string;
-    range: { start: number; end: number };
-  };
-  "finance:quote": { adapterId: string; ticker: string };
-  "finance:portfolio": { adapterId: string; accountId: string };
-  "finance:factor-series": {
-    adapterId: string;
-    name: string;
-    ticker: string;
-    range: { start: number; end: number };
-  };
+interface LxApi {
+  fetch<T = unknown>(req: {
+    route: string;
+    params?: Record<string, unknown>;
+    timeoutMs?: number;
+  }): Promise<LxFetchRes<T>>;
 }
 
-interface FinanceResponsePayloads {
-  "finance:candles": Candle[];
-  "finance:quote": Quote;
-  "finance:portfolio": PortfolioSnapshot;
-  "finance:factor-series": FactorSeriesPoint[];
-}
-
-const invoke = async <TChannel extends FinanceRequestChannel>(
-  channel: TChannel,
-  payload: FinanceRequestPayloads[TChannel]
-): Promise<FinanceResponsePayloads[TChannel]> => {
-  const correlationId = crypto.randomUUID();
-  const request: IpcRequestEnvelope<FinanceRequestPayloads[TChannel]> = {
-    channel,
-    correlationId,
-    payload,
-  };
-
-  const response = (await window.electron.invoke(
-    channel,
-    request
-  )) as IpcResponseEnvelope<FinanceResponsePayloads[TChannel]>;
-
-  if (!response.success) {
-    throw new IpcError(
-      response.error ?? {
-        code: "UNKNOWN_ERROR",
-        message: "Finance service call failed.",
-      }
-    );
+const ensureApi = (): LxApi => {
+  const api = (window as unknown as { lx?: LxApi }).lx;
+  if (!api) {
+    throw new Error("Lixinger IPC bridge not available");
   }
-
-  return response.payload as FinanceResponsePayloads[TChannel];
+  return api;
 };
 
-export const fetchCandles = (payload: FinanceRequestPayloads["finance:candles"]) =>
-  invoke("finance:candles", payload);
+export const getCandles = async (
+  params: CandlesParams
+): Promise<Timeseries<Candle>> => {
+  const api = ensureApi();
+  const res = await api.fetch<Timeseries<Candle>>({
+    route: "fin.candles/get",
+    params,
+  });
+  if (!res.ok || !res.data) {
+    throw new Error(res.err?.message ?? "Unable to fetch candles");
+  }
+  return res.data;
+};
 
-export const fetchQuote = (payload: FinanceRequestPayloads["finance:quote"]) =>
-  invoke("finance:quote", payload);
+export const getQuote = async (params: QuoteParams): Promise<Quote> => {
+  const api = ensureApi();
+  const res = await api.fetch<Quote>({
+    route: "fin.quote/get",
+    params,
+  });
+  if (!res.ok || !res.data) {
+    throw new Error(res.err?.message ?? "Unable to fetch quote");
+  }
+  return res.data;
+};
 
-export const fetchPortfolio = (
-  payload: FinanceRequestPayloads["finance:portfolio"]
-) => invoke("finance:portfolio", payload);
-
-export const fetchFactorSeries = (
-  payload: FinanceRequestPayloads["finance:factor-series"]
-) => invoke("finance:factor-series", payload);
+export const searchSymbols = async (
+  query: string,
+  market?: CandlesParams["market"]
+): Promise<SymbolSearchResult[]> => {
+  const api = ensureApi();
+  const res = await api.fetch<SymbolSearchResult[]>({
+    route: "fin.search/symbols",
+    params: { q: query, market },
+  });
+  if (!res.ok || !res.data) {
+    throw new Error(res.err?.message ?? "Unable to search symbols");
+  }
+  return res.data;
+};
 
 declare global {
   interface Window {
-    electron: {
-      invoke(channel: string, payload: unknown): Promise<unknown>;
-    };
+    lx?: LxApi;
   }
 }

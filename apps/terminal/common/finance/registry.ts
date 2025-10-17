@@ -1,17 +1,16 @@
-import type { FinanceAdapter, FinanceAdapterMetadata } from "./types";
+import type { FinanceAdapter } from "./types";
 
-const adapterStore = new Map<string, FinanceAdapter>();
+const registry = new Map<string, FinanceAdapter>();
 
-export const registerFinanceAdapter = (adapter: FinanceAdapter): void => {
-  adapterStore.set(adapter.metadata.id, adapter);
+export const registerAdapter = (adapter: FinanceAdapter): void => {
+  registry.set(adapter.id, adapter);
 };
 
-export const unregisterFinanceAdapter = (adapterId: string): void => {
-  adapterStore.delete(adapterId);
+export const unregisterAdapter = (adapterId: string): void => {
+  registry.delete(adapterId);
 };
 
-export const getFinanceAdapter = (adapterId: string): FinanceAdapter | undefined =>
-  adapterStore.get(adapterId);
+export const getAdapter = (adapterId: string): FinanceAdapter | undefined =>
+  registry.get(adapterId);
 
-export const listFinanceAdapters = (): FinanceAdapterMetadata[] =>
-  Array.from(adapterStore.values()).map(({ metadata }) => metadata);
+export const listAdapters = (): string[] => Array.from(registry.keys());
