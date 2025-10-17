@@ -13,7 +13,7 @@ const loadFixture = (name: string) => {
   return JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
 };
 
-describe("Lixinger codecs", () => {
+describe("Finance codecs", () => {
   it("parses daily kline payload", () => {
     const json = loadFixture("kline-daily.json");
     const series = parseTimeseriesCandle({
@@ -65,5 +65,30 @@ describe("Lixinger codecs", () => {
     expect(quote.symbol).toBe("000001");
     expect(quote.price).toBeGreaterThan(0);
     expect(quote.ts).toBeGreaterThan(0);
+  });
+
+  it("rejects unsorted candle payloads", () => {
+    expect(() =>
+      parseTimeseriesCandle({
+        symbol: "000001",
+        market: "CN",
+        timeframe: "1d",
+        points: [
+          { t: 1000, o: 1, h: 2, l: 0.5, c: 1.5 },
+          { t: 500, o: 1.1, h: 2.1, l: 0.6, c: 1.6 },
+        ],
+      })
+    ).toThrow(/sorted by ascending timestamp/i);
+  });
+
+  it("rejects quotes with invalid timestamp", () => {
+    expect(() =>
+      parseQuote({
+        symbol: "000001",
+        market: "CN",
+        price: 12.34,
+        ts: -1,
+      })
+    ).toThrow(/non-negative integer/i);
   });
 });
