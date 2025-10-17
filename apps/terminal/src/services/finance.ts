@@ -84,7 +84,8 @@ const withMockFallback = async <TRoute extends FinanceRoute>(
 
 async function loadFixture(route: FinanceRoute): Promise<FinanceResponse<any>> {
   if (route === "fin.candles/get") {
-    const fixture = await import("../../test/fixtures/lixinger/candles.600036.SH.1d.json");
+    const fixtureModule = await import("../../test/fixtures/lixinger/candles.600036.SH.1d.json");
+    const fixture = fixtureModule.default ?? fixtureModule;
     return {
       data: fixture.data as Timeseries<Candle>,
       meta: ensureMeta({ ...fixture.meta, source: "mock" }),
@@ -92,7 +93,8 @@ async function loadFixture(route: FinanceRoute): Promise<FinanceResponse<any>> {
   }
 
   if (route === "fin.quote/get") {
-    const fixture = await import("../../test/fixtures/lixinger/quote.600036.SH.json");
+    const fixtureModule = await import("../../test/fixtures/lixinger/quote.600036.SH.json");
+    const fixture = fixtureModule.default ?? fixtureModule;
     return {
       data: fixture.data as Quote,
       meta: ensureMeta({ ...fixture.meta, source: "mock" }),
