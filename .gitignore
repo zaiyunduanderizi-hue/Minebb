@@ -1,0 +1,6 @@
+node_modules/
+apps/terminal/node_modules/
+apps/terminal/reports/
+reports/playwright-report/
+reports/e2e-artifacts/
+.DS_Store
