@@ -1,26 +1,35 @@
-export interface IpcRequestEnvelope<TPayload = unknown> {
-  channel: string;
-  correlationId: string;
-  payload: TPayload;
-}
+import type { Market, Timeframe } from "../finance/types";
 
-export interface IpcResponseEnvelope<TPayload = unknown> {
-  correlationId: string;
-  success: boolean;
-  payload?: TPayload;
-  error?: IpcErrorPayload;
-}
+export type LxRoute =
+  | "fin.candles/get"
+  | "fin.quote/get"
+  | "fin.search/symbols";
 
-export interface IpcErrorPayload {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
+export type LxFetchReq = {
+  route: LxRoute;
+  params?: Record<string, unknown>;
+  tokenId?: string;
+  timeoutMs?: number;
+};
 
-export type IpcHandler<TRequest = unknown, TResponse = unknown> = (
-  request: IpcRequestEnvelope<TRequest>
-) => Promise<IpcResponseEnvelope<TResponse>>;
+export type LxFetchRes<T = unknown> =
+  | {
+      ok: true;
+      data: T;
+      meta: { cacheHit: boolean; ttl: number; source: "network" | "cache" | "mock" };
+    }
+  | {
+      ok: false;
+      err: { code: string; message: string; details?: unknown };
+      meta: { cacheHit: boolean; ttl: number; source: "network" | "cache" | "mock" };
+    };
 
-export type IpcSubscriptionHandler<TEvent = unknown> = (
-  event: IpcRequestEnvelope<TEvent>
-) => void;
+export type CandlesParams = {
+  symbol: string;
+  market: Market;
+  timeframe: Timeframe;
+  from?: number;
+  to?: number;
+};
+
+export type QuoteParams = { symbol: string; market: Market };
