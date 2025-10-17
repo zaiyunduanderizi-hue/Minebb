@@ -1,0 +1,16 @@
+{
+  "data": {
+    "symbol": "600036",
+    "market": "CN",
+    "price": 41.96,
+    "change": 0.21,
+    "changePct": 0.005,
+    "ts": 1717568400000,
+    "currency": "CNY"
+  },
+  "meta": {
+    "cacheHit": false,
+    "ttl": 15,
+    "source": "mock"
+  }
+}
