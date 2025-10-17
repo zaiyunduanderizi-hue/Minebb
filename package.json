@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "build": "pnpm -r run build"
+    "build": "pnpm -r run build",
+    "test:unit": "pnpm --filter @minebb/terminal test:unit",
+    "test:e2e": "pnpm --filter @minebb/terminal test:e2e",
+    "test:all": "pnpm --filter @minebb/terminal test:all"
   }
 }
