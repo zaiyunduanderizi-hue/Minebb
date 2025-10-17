@@ -1,4 +1,4 @@
-import type { FinanceAdapter } from "./types";
+import type { FinanceAdapter } from "@minebb/common/finance/types";
 
 const registry = new Map<string, FinanceAdapter>();
 

@@ -1,14 +1,15 @@
 import fetch, { type Response } from "node-fetch";
-import { parseQuote, parseTimeseriesCandle } from "../../../../common/finance/codecs";
+import { parseQuote, parseTimeseriesCandle } from "@minebb/main/finance/codecs";
 import type {
   Candle,
   FinanceAdapter,
   Market,
   Quote,
+  SymbolCode,
   SymbolSearchResult,
   Timeframe,
   Timeseries,
-} from "../../../../common/finance/types";
+} from "@minebb/common/finance/types";
 
 const BASE_URL = "https://open.lixinger.com/api";
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];
@@ -266,13 +267,13 @@ const extractCandles = (raw: unknown): Array<Record<string, unknown>> => {
 };
 
 const toTimeseries = (
-  symbol: string,
+  symbol: SymbolCode,
   market: Market,
   timeframe: Timeframe,
   rows: Array<Record<string, unknown>>
 ): Timeseries<Candle> => {
   const points = rows
-    .map((row) => {
+    .reduce<Candle[]>((acc, row) => {
       const t =
         parseTimestamp(
           row.date ??
@@ -300,18 +301,31 @@ const toTimeseries = (
         l === undefined ||
         c === undefined
       ) {
-        return undefined;
+        return acc;
       }
-      return { t, o, h, l, c, v };
-    })
-    .filter((item): item is Candle => Boolean(item))
+      const candle: Candle = {
+        t,
+        o,
+        h,
+        l,
+        c,
+        ...(v !== undefined ? { v } : {}),
+      };
+      acc.push(candle);
+      return acc;
+    }, [])
     .sort((a, b) => a.t - b.t);
 
   return parseTimeseriesCandle({ symbol, market, timeframe, points });
 };
 
+const currencyByMarket: Record<Market, string> = {
+  CN: "CNY",
+  HK: "HKD",
+};
+
 const toQuote = (
-  symbol: string,
+  symbol: SymbolCode,
   market: Market,
   raw: Record<string, unknown>
 ): Quote => {
@@ -325,31 +339,55 @@ const toQuote = (
     parseTimestamp(
       raw.time ?? raw.timestamp ?? raw.ts ?? raw.date ?? raw.lastTime
     ) ?? Date.now();
-  return parseQuote({ symbol, market, price, change, changePct, ts });
+  return parseQuote({
+    symbol,
+    market,
+    price,
+    change,
+    changePct,
+    currency: currencyByMarket[market],
+    ts,
+  });
 };
 
 const toSearchResults = (
   rows: Array<Record<string, unknown>>
-): SymbolSearchResult[] =>
-  rows
-    .map((row) => {
-      const symbol =
-        (row.symbol as string) ??
-        (row.stockCode as string) ??
-        (row.code as string);
-      if (!symbol) {
-        return undefined;
-      }
-      const market =
-        (row.market as Market) ??
-        ((row.areaCode as string)?.toUpperCase() === "HK" ? "HK" : "CN");
-      const name = (row.name as string) ?? (row.cnName as string);
-      return { symbol, market, name } satisfies SymbolSearchResult;
-    })
-    .filter((item): item is SymbolSearchResult => Boolean(item));
+): SymbolSearchResult[] => {
+  const results: SymbolSearchResult[] = [];
+  for (const row of rows) {
+    const symbol =
+      (row.symbol as string) ??
+      (row.stockCode as string) ??
+      (row.code as string);
+    if (!symbol) {
+      continue;
+    }
+    const market =
+      (row.market as Market) ??
+      ((row.areaCode as string)?.toUpperCase() === "HK" ? "HK" : "CN");
+    const name = (row.name as string) ?? (row.cnName as string);
+    const entry: SymbolSearchResult = {
+      symbol,
+      market,
+      ...(name ? { name } : {}),
+    };
+    results.push(entry);
+  }
+  return results;
+};
 
 export const lixingerAdapter: FinanceAdapter = {
   id: "lixinger",
+  metadata: {
+    displayName: "Lixinger",
+    markets: ["CN", "HK"],
+    timeframes: ["1d", "1w", "1m"],
+    capabilities: ["candles", "quote", "search"],
+    rateLimits: [
+      { intervalMs: 60_000, limit: 120, scope: "global" },
+      { intervalMs: 1_000, limit: 6, scope: "burst" },
+    ],
+  },
   async getCandles({ symbol, market, timeframe, from, to }) {
     const body = {
       stockCode: symbol,

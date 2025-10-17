@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Candle, Quote, Timeseries } from "./types";
+import type { Candle, Quote, Timeseries } from "@minebb/common/finance/types";
 
 const friendlyErrorMap: z.ZodErrorMap = (issue, ctx) => {
   const path = issue.path.join(".");
@@ -90,6 +90,7 @@ export const quoteSchema = z
       price: number(),
       change: number().optional(),
       changePct: number().optional(),
+      currency: z.string().min(1).optional(),
       ts: number().int().nonnegative("Timestamp must be a non-negative integer."),
     },
     { errorMap: friendlyErrorMap }

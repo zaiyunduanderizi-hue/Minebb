@@ -1,3 +1,5 @@
+export type SymbolCode = string;
+
 export type Market = "CN" | "HK";
 export type Timeframe = "1d" | "1w" | "1m";
 
@@ -11,7 +13,7 @@ export interface Candle {
 }
 
 export interface Timeseries<TPoint> {
-  symbol: string;
+  symbol: SymbolCode;
   market: Market;
   timeframe: Timeframe;
   points: TPoint[];
@@ -19,39 +21,46 @@ export interface Timeseries<TPoint> {
 }
 
 export interface Quote {
-  symbol: string;
+  symbol: SymbolCode;
   market: Market;
   price: number;
   change?: number;
   changePct?: number;
+  currency?: string;
   ts: number;
 }
 
 export interface SymbolSearchResult {
-  symbol: string;
+  symbol: SymbolCode;
   market: Market;
   name?: string;
 }
 
+export interface FinanceAdapterMetadata {
+  displayName?: string;
+  markets?: Market[];
+  timeframes?: Timeframe[];
+  capabilities?: string[];
+  rateLimits?: Array<{
+    intervalMs: number;
+    limit: number;
+    scope?: string;
+  }>;
+}
+
 export interface FinanceAdapter {
   id: string;
+  metadata?: FinanceAdapterMetadata;
   getCandles(params: {
-    symbol: string;
+    symbol: SymbolCode;
     market: Market;
     timeframe: Timeframe;
     from?: number;
     to?: number;
   }): Promise<Timeseries<Candle>>;
-  getQuote(params: { symbol: string; market: Market }): Promise<Quote>;
+  getQuote(params: { symbol: SymbolCode; market: Market }): Promise<Quote>;
   searchSymbols?(
     query: string,
     market?: Market
   ): Promise<SymbolSearchResult[]>;
-}
-
-export interface FinanceAdapterMetadata {
-  id: string;
-  displayName?: string;
-  markets?: Market[];
-  timeframes?: Timeframe[];
 }
