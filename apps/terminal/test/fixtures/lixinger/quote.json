@@ -1,0 +1,18 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "stockCode": "000001",
+    "market": "CN",
+    "price": 12.58,
+    "change": 0.26,
+    "changePct": 2.11,
+    "time": "2024-01-05T15:00:00+08:00",
+    "high": 12.70,
+    "low": 12.40,
+    "open": 12.32,
+    "previousClose": 12.32,
+    "volume": 423198765,
+    "turnover": 5234098712.56
+  }
+}

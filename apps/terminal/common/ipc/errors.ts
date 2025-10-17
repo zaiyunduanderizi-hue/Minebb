@@ -1,8 +1,12 @@
-import type { IpcErrorPayload } from "./dto";
+export interface IpcErrorPayload {
+  code: string;
+  message: string;
+  details?: unknown;
+}
 
 export class IpcError extends Error {
   readonly code: string;
-  readonly details?: Record<string, unknown>;
+  readonly details?: unknown;
 
   constructor(payload: IpcErrorPayload) {
     super(payload.message);
@@ -23,7 +27,7 @@ export class IpcError extends Error {
 export const createIpcErrorPayload = (
   code: string,
   message: string,
-  details?: Record<string, unknown>
+  details?: unknown
 ): IpcErrorPayload => ({
   code,
   message,

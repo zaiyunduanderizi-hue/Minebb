@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@minebb/common/*": ["apps/terminal/common/*"],
+      "@minebb/main/*": ["apps/terminal/main/*"]
+    }
+  },
+  "include": ["apps/**/*", "scripts/**/*"],
+  "exclude": ["**/dist", "**/node_modules"]
+}
