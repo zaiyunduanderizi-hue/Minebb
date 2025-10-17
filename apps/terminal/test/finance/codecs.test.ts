@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseQuote,
   parseTimeseriesCandle,
-} from "../../common/finance/codecs";
+} from "@minebb/main/finance/codecs";
 
 const loadFixture = (name: string) => {
   const base = dirname(fileURLToPath(import.meta.url));

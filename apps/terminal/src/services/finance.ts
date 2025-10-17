@@ -1,70 +1,41 @@
-import type { CandlesParams, LxFetchRes, QuoteParams } from "../../common/ipc/dto";
-import type {
-  Candle,
-  Quote,
-  SymbolSearchResult,
-  Timeseries,
-} from "../../common/finance/types";
+import type { Candle, Market, Quote, SymbolSearchResult, Timeframe, Timeseries } from "@minebb/common/finance/types";
+import type { IpcChannels } from "@minebb/main/ipc/channels";
 
-interface LxApi {
-  fetch<T = unknown>(req: {
-    route: string;
-    params?: Record<string, unknown>;
-    timeoutMs?: number;
-  }): Promise<LxFetchRes<T>>;
-}
+type CandlesRequest = IpcChannels["finance:getCandles"]["req"];
+type QuoteRequest = IpcChannels["finance:getQuote"]["req"];
+type SearchRequest = IpcChannels["finance:search"]["req"];
 
-const ensureApi = (): LxApi => {
-  const api = (window as unknown as { lx?: LxApi }).lx;
-  if (!api) {
-    throw new Error("Lixinger IPC bridge not available");
+type FinanceBridge = Window["minebb"]["finance"];
+
+const ensureBridge = (): FinanceBridge => {
+  const bridge = window.minebb?.finance;
+  if (!bridge) {
+    throw new Error("Finance bridge is not available in the current context.");
   }
-  return api;
+  return bridge;
 };
 
 export const getCandles = async (
-  params: CandlesParams
+  params: CandlesRequest
 ): Promise<Timeseries<Candle>> => {
-  const api = ensureApi();
-  const res = await api.fetch<Timeseries<Candle>>({
-    route: "fin.candles/get",
-    params,
-  });
-  if (!res.ok || !res.data) {
-    throw new Error(res.err?.message ?? "Unable to fetch candles");
-  }
-  return res.data;
+  return ensureBridge().getCandles(params);
 };
 
-export const getQuote = async (params: QuoteParams): Promise<Quote> => {
-  const api = ensureApi();
-  const res = await api.fetch<Quote>({
-    route: "fin.quote/get",
-    params,
-  });
-  if (!res.ok || !res.data) {
-    throw new Error(res.err?.message ?? "Unable to fetch quote");
-  }
-  return res.data;
+export const getQuote = async (params: QuoteRequest): Promise<Quote> => {
+  return ensureBridge().getQuote(params);
 };
 
 export const searchSymbols = async (
   query: string,
-  market?: CandlesParams["market"]
+  market?: Market
 ): Promise<SymbolSearchResult[]> => {
-  const api = ensureApi();
-  const res = await api.fetch<SymbolSearchResult[]>({
-    route: "fin.search/symbols",
-    params: { q: query, market },
-  });
-  if (!res.ok || !res.data) {
-    throw new Error(res.err?.message ?? "Unable to search symbols");
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [];
   }
-  return res.data;
+  const request: SearchRequest = { query: trimmed, market };
+  return ensureBridge().search(request);
 };
 
-declare global {
-  interface Window {
-    lx?: LxApi;
-  }
-}
+export type FinanceTimeseries = Timeseries<Candle>;
+export type FinanceTimeframe = Timeframe;
