@@ -26,8 +26,9 @@ registerIndicator("sma", ({ series, params }): IndicatorResult => {
         return undefined;
       }
       const slice = series.slice(index + 1 - period, index + 1);
-      const avg = slice.reduce((sum, { c }) => sum + c, 0) / slice.length;
-      return { timestamp: candle.t, value: avg };
+      const avg =
+        slice.reduce((sum, { close }) => sum + close, 0) / slice.length;
+      return { timestamp: candle.timestamp, value: avg };
     })
     .filter((entry): entry is { timestamp: number; value: number } => Boolean(entry));
 

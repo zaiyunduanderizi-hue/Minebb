@@ -24,31 +24,3 @@ export type IpcHandler<TRequest = unknown, TResponse = unknown> = (
 export type IpcSubscriptionHandler<TEvent = unknown> = (
   event: IpcRequestEnvelope<TEvent>
 ) => void;
-
-export type LxRoute = "fin.candles/get" | "fin.quote/get";
-
-export type LxSource = "network" | "cache" | "mock";
-
-export interface LxFetchRequest<TParams = Record<string, unknown>> {
-  route: LxRoute;
-  params?: TParams;
-  tokenId?: string;
-  timeoutMs?: number;
-}
-
-export interface LxResponseMeta {
-  cacheHit: boolean;
-  ttl: number;
-  source: LxSource;
-  receivedAt?: number;
-}
-
-export interface LxErrorShape {
-  code: string;
-  message: string;
-  details?: unknown;
-}
-
-export type LxFetchResponse<TData = unknown> =
-  | { ok: true; data: TData; meta: LxResponseMeta }
-  | { ok: false; err: LxErrorShape; meta: LxResponseMeta };
