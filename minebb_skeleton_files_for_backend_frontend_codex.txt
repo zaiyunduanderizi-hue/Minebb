@@ -1,0 +1,294 @@
+# File: apps/terminal/common/ipc/dto.ts
+import type { Market, Timeframe } from "../finance/types";
+
+export type LxRoute =
+  | "fin.candles/get"
+  | "fin.quote/get"
+  | "fin.search/symbols";
+
+export type LxFetchReq = {
+  route: LxRoute;
+  params?: Record<string, unknown>; // { symbol, market, timeframe, from?, to? }
+  tokenId?: string;                  // 多数据源/多token时选择
+  timeoutMs?: number;
+};
+
+export type LxFetchRes<T = unknown> =
+  | { ok: true; data: T; meta: { cacheHit: boolean; ttl: number; source: "network"|"cache"|"mock" } }
+  | { ok: false; err: { code: string; message: string; details?: unknown };
+      meta: { cacheHit: boolean; ttl: number; source: "network"|"cache"|"mock" } };
+
+export type CandlesParams = { symbol: string; market: Market; timeframe: Timeframe; from?: number; to?: number };
+export type QuoteParams = { symbol: string; market: Market };
+
+
+# File: apps/terminal/common/finance/types.ts
+export type Market = "CN" | "HK";
+export type Timeframe = "1d" | "1w" | "1m"; // Lixinger 以日/周/月为主
+
+export interface Candle { t: number; o: number; h: number; l: number; c: number; v?: number }
+export interface Timeseries<T> {
+  symbol: string;
+  market: Market;
+  timeframe: Timeframe;
+  points: T[];
+  meta?: Record<string, unknown>;
+}
+export interface Quote {
+  symbol: string; market: Market; price: number; change?: number; changePct?: number; ts: number
+}
+
+
+# File: apps/terminal/common/finance/registry.ts
+import type { Market, Timeframe, Timeseries, Candle, Quote } from "./types";
+
+export interface FinanceAdapter {
+  id: string;
+  getCandles(p: { symbol: string; market: Market; timeframe: Timeframe; from?: number; to?: number }): Promise<Timeseries<Candle>>;
+  getQuote(p: { symbol: string; market: Market }): Promise<Quote>;
+  searchSymbols?(q: string, market?: Market): Promise<Array<{symbol:string;market:Market;name?:string}>>;
+}
+
+const registry = new Map<string, FinanceAdapter>();
+export const registerAdapter = (a: FinanceAdapter) => registry.set(a.id, a);
+export const getAdapter = (id: string) => registry.get(id);
+export const listAdapters = () => Array.from(registry.keys());
+
+
+# File: apps/terminal/electron/main/adapters/lixinger/index.ts
+// 注意：此为最小骨架；具体 endpoint/字段需按你确认的接口精确化
+import fetch from "node-fetch";
+import type { FinanceAdapter } from "../../../../common/finance/registry";
+import type { Market, Timeframe, Timeseries, Candle, Quote } from "../../../../common/finance/types";
+
+const BASE = "https://open.lixinger.com/api";
+
+function getSecretToken(tokenId?: string): string {
+  const envKey = tokenId ? `MINEBB_LIX_TOKEN_${tokenId.toUpperCase()}` : "MINEBB_LIX_TOKEN";
+  const fromEnv = process.env[envKey];
+  if (fromEnv) return fromEnv;
+  throw new Error("Lixinger token not configured (set env MINEBB_LIX_TOKEN)");
+}
+
+async function postJson(path: string, body: any, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BASE}/${path}` , {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw { code: "42901", message: "rate limited" };
+      if (res.status === 401) throw { code: "40102", message: "unauthorized" };
+      throw { code: "UNEXPECTED", message: `http ${res.status}` };
+    }
+    const json = await res.json();
+    if (json.code && json.code !== 0) throw { code: String(json.code), message: json.msg || "api error", details: json };
+    return json.data ?? json;
+  } catch (e:any) {
+    if (e?.name === "AbortError") throw { code: "TIMEOUT", message: "request timeout" };
+    if (e?.code) throw e;
+    throw { code: "NETWORK", message: e?.message ?? "network error" };
+  } finally { clearTimeout(t); }
+}
+
+function toTimeseries(symbol: string, market: Market, timeframe: Timeframe, rows: any[]): Timeseries<Candle> {
+  const points = (rows ?? []).map(r => ({
+    t: +new Date(r.date || r.time || r.t || r.timestamp),
+    o: +r.open || +r.o,
+    h: +r.high || +r.h,
+    l: +r.low  || +r.l,
+    c: +r.close|| +r.c,
+    v: r.volume ?? r.v
+  })).filter(p=>Number.isFinite(p.t) && Number.isFinite(p.c)).sort((a,b)=>a.t-b.t);
+  return { symbol, market, timeframe, points };
+}
+
+export const lixingerAdapter: FinanceAdapter = {
+  id: "lixinger",
+  async getCandles(p) {
+    const token = getSecretToken();
+    // TODO: 将下面的 path 与参数替换为你确认的 Lixinger K 线接口
+    const data = await postJson("a/stock/kline", {
+      token,
+      symbol: p.symbol,
+      period: p.timeframe,
+      startDate: p.from,
+      endDate: p.to,
+    });
+    return toTimeseries(p.symbol, p.market, p.timeframe, data);
+  },
+  async getQuote(p) {
+    const token = getSecretToken();
+    const data = await postJson("a/stock/quote", { token, symbol: p.symbol });
+    const price = +data?.price ?? +data?.c ?? 0;
+    const change = data?.chg;
+    const changePct = data?.chgPct;
+    return { symbol: p.symbol, market: p.market, price, change, changePct, ts: Date.now() } as Quote;
+  },
+  async searchSymbols(q: string, market?: Market) {
+    const token = getSecretToken();
+    const data = await postJson("a/stock/search", { token, keyword: q, market });
+    return (data ?? []).map((x: any) => ({ symbol: x.symbol, market: (x.market ?? "CN") as Market, name: x.name }));
+  }
+};
+
+
+# File: apps/terminal/electron/main/index.ts
+import { app, BrowserWindow, ipcMain } from "electron";
+import { registerAdapter, getAdapter } from "../../common/finance/registry";
+import { lixingerAdapter } from "./adapters/lixinger";
+import type { LxFetchReq } from "../../common/ipc/dto";
+
+registerAdapter(lixingerAdapter);
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      contextIsolation: true,
+      preload: __dirname + "/../preload/index.js",
+    },
+  });
+  win.loadURL(process.env.VITE_DEV_SERVER_URL || `file://${__dirname}/index.html`);
+}
+
+app.whenReady().then(() => {
+  ipcMain.handle("lx.fetch", async (_evt, req: LxFetchReq) => {
+    const meta = { cacheHit: false, ttl: 0, source: "network" as const };
+    try {
+      const a = getAdapter("lixinger");
+      if (!a) return { ok: false, err: { code: "UNEXPECTED", message: "adapter not found" }, meta };
+      switch (req.route) {
+        case "fin.candles/get": return { ok: true, data: await a.getCandles(req.params as any), meta };
+        case "fin.quote/get":   return { ok: true, data: await a.getQuote(req.params as any),   meta };
+        case "fin.search/symbols": return { ok: true, data: await a.searchSymbols?.((req.params as any)?.q, (req.params as any)?.market), meta };
+        default: return { ok: false, err: { code: "UNEXPECTED", message: "unknown route" }, meta };
+      }
+    } catch (e:any) {
+      const err = { code: e?.code ?? "UNEXPECTED", message: e?.message ?? "error", details: e };
+      return { ok: false, err, meta };
+    }
+  });
+  createWindow();
+});
+
+
+# File: apps/terminal/electron/preload/index.ts
+import { contextBridge, ipcRenderer } from "electron";
+contextBridge.exposeInMainWorld("lx", {
+  fetch: (req: any) => ipcRenderer.invoke("lx.fetch", req)
+});
+
+
+# File: apps/terminal/src/services/finance.ts
+import type { Timeseries, Candle, Quote, Market, Timeframe } from "../../common/finance/types";
+
+export async function getCandles(p:{symbol:string;market:Market;timeframe:Timeframe; from?:number; to?:number}) {
+  const r = await (window as any).lx.fetch({ route: "fin.candles/get", params: p });
+  if (!r.ok) throw new Error(r.err?.message || "fetch error");
+  return r.data as Timeseries<Candle>;
+}
+export async function getQuote(p:{symbol:string;market:Market}) {
+  const r = await (window as any).lx.fetch({ route: "fin.quote/get", params: p });
+  if (!r.ok) throw new Error(r.err?.message || "fetch error");
+  return r.data as Quote;
+}
+
+
+# File: apps/terminal/src/panels/KLinePanel.tsx
+import React from "react";
+import { useEffect, useRef } from "react";
+import { getCandles } from "../services/finance";
+
+export default function KLinePanel() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [state, setState] = React.useState<any>({ loading: true });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getCandles({ symbol: "600036.SH", market: "CN", timeframe: "1d" });
+        setState({ loading: false, data });
+      } catch (e:any) {
+        setState({ loading: false, error: e?.message || String(e) });
+      }
+    })();
+  }, []);
+
+  if (state.loading) return <div>加载中…</div>;
+  if (state.error) return <div style={{color:"tomato"}}>错误：{state.error}</div>;
+  return (
+    <div ref={ref} style={{height: 360, border: "1px solid #e5e7eb", borderRadius: 8, padding: 8}}>
+      <div style={{fontSize:12,opacity:0.7,marginBottom:6}}>K线（示意，无图表库，等前端接入图表组件）</div>
+      <pre style={{height: "calc(100% - 24px)", overflow: "auto", background:"#0b1020", color:"#e5e7eb", padding:8, borderRadius:6}}>
+        {JSON.stringify(state.data.points.slice(0, 5), null, 2)}
+      </pre>
+    </div>
+  );
+}
+
+
+# File: apps/terminal/src/components/TokenDialog.tsx
+import React from "react";
+
+export function TokenDialog() {
+  return (
+    <div style={{padding:12,border:"1px solid #eee",borderRadius:8}}>
+      <h3>配置 Lixinger Token</h3>
+      <p>出于安全考虑，不在应用内存储明文。请在系统环境变量中设置：</p>
+      <code>MINEBB_LIX_TOKEN=你的token</code>
+    </div>
+  );
+}
+
+
+# File: apps/terminal/package.json
+{
+  "name": "@minebb/terminal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "electron:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron apps/terminal/electron/main/index.ts",
+    "build": "tsc -p .",
+    "test": "vitest",
+    "verify": "node ./scripts/verify-environment.cjs"
+  },
+  "dependencies": {
+    "electron": "^31.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.5",
+    "cross-env": "^7.0.3"
+  }
+}
+
+
+# File: scripts/setup-workspace.ps1
+param()
+Write-Host "[Minebb] 环境检查..." -ForegroundColor Cyan
+$pnpm = (Get-Command pnpm -ErrorAction SilentlyContinue)
+if (-not $pnpm) { Write-Error "未检测到 pnpm，请先安装: corepack enable && corepack prepare pnpm@latest --activate"; exit 1 }
+node -v; pnpm -v
+Write-Host "安装依赖..." -ForegroundColor Cyan
+pnpm i
+Write-Host "验证构建/测试脚本存在..." -ForegroundColor Cyan
+Write-Host "完成。可运行: pnpm --filter @minebb/terminal dev / electron:dev / test" -ForegroundColor Green
+
+
+# File: reports/bootstrap-verification.md
+# 本地自检清单（Bootstrap Verification)
+- [ ] `pnpm i` 成功
+- [ ] 设定环境变量 `MINEBB_LIX_TOKEN`
+- [ ] `pnpm --filter @minebb/terminal dev` 启动前端
+- [ ] `pnpm --filter @minebb/terminal electron:dev` 启动 Electron，打开 KLinePanel
+- [ ] 运行一次 `fin.candles/get`，无 token 时得到 401 提示；设置 token 后成功返回
+- [ ] （可选）模拟 429，观察退避提示
