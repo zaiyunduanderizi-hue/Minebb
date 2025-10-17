@@ -38,7 +38,7 @@ export interface IndicatorInput {
 
 export interface IndicatorResult {
   name: string;
-  values: Array<{ timestamp: number; value: number }>;
+  values: Array<{ t: number; value: number }>;
   meta?: Record<string, unknown>;
 }
 

@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@minebb/common/*": ["apps/terminal/common/*"],
+      "@minebb/main/*": ["apps/terminal/main/*"],
+      "@minebb/ui/*": ["apps/terminal/renderer/*"]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import type { IndicatorInput, IndicatorResult } from "./types";
+import type { IndicatorInput, IndicatorResult } from "@minebb/common/finance/types";
 
 export type IndicatorComputeFn = (input: IndicatorInput) => IndicatorResult;
 
@@ -27,9 +27,9 @@ registerIndicator("sma", ({ series, params }): IndicatorResult => {
       }
       const slice = series.slice(index + 1 - period, index + 1);
       const avg = slice.reduce((sum, { c }) => sum + c, 0) / slice.length;
-      return { timestamp: candle.t, value: avg };
+      return { t: candle.t, value: avg };
     })
-    .filter((entry): entry is { timestamp: number; value: number } => Boolean(entry));
+    .filter((entry): entry is { t: number; value: number } => Boolean(entry));
 
   return {
     name: "sma",
